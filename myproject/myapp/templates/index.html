@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PDF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f8f8;
+            margin: 0;
+            padding: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            border: 1px solid #87CEEB;  /* 하늘색 테두리 */
+            padding: 12px;  /* 셀 내 패딩 */
+            text-align: center;
+        }
+        th {
+            background-color: #87CEEB;  /* 하늘색 배경 */
+            color: white;  /* 글자 색상 */
+            font-size: 16px;  /* 글자 크기 */
+        }
+        tr:hover {
+            background-color: #b0e0e6;  /* 마우스 오버 시 하늘색 */
+        }
+        a.btn {
+            padding: 8px 12px;
+            background-color: #007bff;  /* 버튼 배경색 */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;  /* 배경색 변화 효과 */
+        }
+        a.btn:hover {
+            background-color: #0056b3;  /* 버튼 호버 시 색상 */
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <tr>
+            <th>생성일</th>
+            <th>호스트명</th>
+            <th>컨트롤러</th>
+            <th>Uptime</th>
+            <th>장치</th>
+            <th>VCPU</th>
+            <th>Memory</th>
+            <th>Image</th>
+            <th>IP</th>
+            <th>PDF</th>
+        </tr>
+        {% for instance in data %}
+        <tr>
+            <td>{{ instance.created_at|date:"Y-m-d" }}</td>
+            <td>{{ instance.hostname }}</td>
+            <td>{{ instance.host }}</td>
+            <td>{{ instance.uptime }}</td>
+            <td>{{ instance.device }}</td>
+            <td>{{ instance.vcpus }}</td>
+            <td>{{ instance.memory_mb }}</td>
+            <td>{{ instance.image }}</td>
+            <td>{{ instance.ip_addresses }}</td>
+            <td>
+                <a href="{% url 'some_view' instance.id %}" class="btn">PDF</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PDF</title>
+</head>
+<body>
+    
+
+    <table border="1">
+    <tr>
+        <th>생성일</th>
+        <th>호스트명</th>
+        <th>컨트롤러</th>
+        <th>Uptime</th>
+        <th>장치</th>
+        <th>VCPU</th>
+        <th>Memory</th>
+        <th>Image</th>
+        <th>IP</th>
+        <th>PDF</th>
+    </tr>
+    {% for instance in data %}
+    <tr>
+        <td>{{ instance.created_at|date:"Y-m-d" }}</td>
+        <td>{{ instance.hostname }}</td>
+        <td>{{ instance.host }}</td>
+        <td>{{ instance.uptime }}</td>
+        <td>{{ instance.device }}</td>
+        <td>{{ instance.vcpus }}</td>
+        <td>{{ instance.memory_mb }}</td>
+        <td>{{ instance.image }}</td>
+        <td>{{ instance.ip_addresses }}</td>
+        <td>
+            <a href="{% url 'some_view' instance.id %}" class="btn btn-primary">PDF</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html> -->
