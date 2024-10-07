@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
 from .service import *
+from .es import *
 from django.conf import settings
 import json
 from django.core.files.storage import default_storage
@@ -101,11 +102,11 @@ def categorize(value):
         if value is None:  
             return 'N/A'  
         if value <= 30:
-            return '하'
+            return '하 (30% 이하)'
         elif value <= 70:
-            return '중'
+            return '중 (70% 이하)'
         else:
-            return '상'
+            return '상 (70% 초과)'
         
 ########################################################################################################### 보고서
 
@@ -138,7 +139,8 @@ def some_view(request, instance_id):
         rows = cursor.fetchall()
     
     data = []
-    
+    current_time = timezone.now()
+
     for row in rows:
 
         updated_at = row[5]
@@ -146,7 +148,6 @@ def some_view(request, instance_id):
         if updated_at.tzinfo is None:
             updated_at = make_aware(updated_at)
 
-        current_time = timezone.now()
         uptime = current_time - updated_at
         days = uptime.days
         hours = (uptime.seconds // 3600) % 24
@@ -234,7 +235,7 @@ def some_view(request, instance_id):
         ['날짜', '2024-09', 'Uptime', formatted_uptime],
         ['호스트명', instance_data['hostname'], '컨트롤러', instance_data['host']],
         ['image', 'ubuntu', '장치', instance_data['root_device_name']],
-        ['VCPU', instance_data['vcpus'], 'MEMORY', instance_data['memory_mb']],
+        ['VCPU', instance_data['vcpus'], 'MEMORY(mb)', instance_data['memory_mb']],
     ]
     # Adjust column widths to fit the page width
     equipment_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
@@ -267,7 +268,6 @@ def some_view(request, instance_id):
         selected_ip = None  # else 블록에서 명시적으로 None을 설정
 
     if selected_ip:
-        print(selected_ip)
         avg_cpu_usage, avg_mem_usage, avg_disk_size, avg_disk_used = get_resource_usage_averages(selected_ip)
         
         process_style = styles['Normal']
@@ -278,7 +278,7 @@ def some_view(request, instance_id):
         process_style.spaceAfter = 10  # Space after paragraph
         process_style.alignment = 1  # Center-align text
 
-        text_between_tables = Paragraph("자원사용 위험도", process_style)
+        text_between_tables = Paragraph("자원사용량 요약", process_style)
         elements.append(text_between_tables)
 
         resource_data = [
@@ -308,6 +308,38 @@ def some_view(request, instance_id):
         process_style.spaceBefore = 10
         process_style.spaceAfter = 10  # Space after paragraph
         process_style.alignment = 1  # Center-align text
+
+        
+        ip_suffix = selected_ip.split(':')[0].split('.')[-1]
+        today_date = datetime.now().strftime("%Y.%m.%d")
+        index_pattern = f"{ip_suffix}syslog_logs_{today_date}"
+
+        log_levels_buckets = fetch_log_levels(index_pattern)
+
+        if log_levels_buckets: 
+            filtered_log_levels = filter_log_levels(log_levels_buckets)
+
+            text_between_tables = Paragraph("로그 요약", process_style)
+            elements.append(text_between_tables)
+
+            resource_data = [
+                ['로그 레벨', '카운트']
+            ]
+            for log in filtered_log_levels:
+                resource_data.append([log['level'], str(log['count'])])
+
+            main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
+            main_process_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 0), (-1, -1), 'font'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
+            ]))
+            elements.append(main_process_table)
 
         # text_between_tables = Paragraph("주요 프로세스", process_style)
         # elements.append(text_between_tables)
