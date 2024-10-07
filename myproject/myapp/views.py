@@ -44,7 +44,9 @@ def home_view(request):
         JOIN 
             block_device_mapping b 
         ON 
-            i.id = b.id;
+            i.id = b.id
+        WHERE
+            i.vm_state = 'active';
     '''
 
     with connections['mariadb_nova'].cursor() as cursor:
