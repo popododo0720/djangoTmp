@@ -52,6 +52,20 @@ class InstanceProcessMem(models.Model):
         managed = False 
         db_table = 'instance_process_mem'
 
+class InstancePortMem(models.Model):
+    state = models.TextField()
+    recvq = models.TextField()
+    sendq = models.TextField()
+    local = models.TextField()
+    peer = models.TextField()
+    process = models.TextField()
+    timestamp = models.DateTimeField()
+    instance = models.TextField()
+
+    class Meta:
+        managed = False 
+        db_table = 'instance_ports'
+
 class Instance(models.Model):
     id = models.IntegerField(primary_key=True)
     display_name = models.CharField(max_length=255)

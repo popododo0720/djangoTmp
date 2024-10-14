@@ -8,7 +8,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
-from .service import *
+from myapp.service import *
 from .es import *
 from django.conf import settings
 import json
@@ -168,7 +168,7 @@ def some_view(request, instance_id):
         })
     instance_data = data[0]
 
-    file_path = '/monitoring/targets.json'
+    file_path = '/monitoring/serverIp.json'
     with open(file_path, 'r') as f:
         targets = json.load(f)
 
@@ -247,7 +247,7 @@ def some_view(request, instance_id):
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BACKGROUND', (0, 0), (-1, 0), colors.white),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid linesF
         ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
     ]))
@@ -508,28 +508,41 @@ def some_view(request, instance_id):
         # Add the new table to the elements list
         elements.append(new_table)
 
-############################################################################################ last 추가시
-        text_between_tables = Paragraph("last", process_style)
+        elements.append(PageBreak())
+
+        text_between_tables = Paragraph("사용중인 포트", process_style)
         elements.append(text_between_tables)
 
-        # top_mem_usages = get_process_mem_usage_top5(selected_ip)
+        top_port_usages = get_unique_port_usage(selected_ip)
 
         # Define the new table data
-        process_mem_data = [
-            ['Command', 'PID', 'User', 'MEM%']
+        port_data = [
+            ['Process', 'Local', 'Peer', 'State', 'RecvQ', 'SendQ']
         ]
 
-        for i in range(0,5):
-            process_mem_data.append([
-                'command',
-                'pid',
-                'instance_user',
-                'avg_mem_usage'
+        for port_usage in top_port_usages:
+
+            process_text = port_usage['process']
+
+            if len(process_text) > 10:  
+                process_text = process_text[:10] + '\n' + process_text[10:]
+
+            local_text = port_usage['local']
+            if len(local_text) > 12:  
+                local_text = '...' + local_text[-9:]  
+
+            port_data.append([
+                truncate_text(process_text, 20),
+                local_text,
+                port_usage['peer'],
+                port_usage['state'],
+                port_usage['recvq'],
+                port_usage['sendq']
             ])
 
         # Adjust column widths to fit the page width
-        new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
-        new_table = Table(process_mem_data, colWidths=[new_table_col_width] * 2)
+        new_table_col_width = (doc.pagesize[0] - 2 * 72) / 6  # Divide by the number of columns
+        new_table = Table(port_data, colWidths=[new_table_col_width] * 2)
         new_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONT', (0, 0), (-1, -1), 'font'),
@@ -544,7 +557,6 @@ def some_view(request, instance_id):
 
         # Add the new table to the elements list
         elements.append(new_table)
-
 
         elements.append(PageBreak())
 
