@@ -54,7 +54,7 @@ def home_view(request):
         cursor.execute(query)
         rows = cursor.fetchall()
 
-    with open('/monitoring/targets.json') as f:
+    with open('/monitoring/serverIp.json') as f:
         targets = json.load(f)
 
     data = []
@@ -507,6 +507,45 @@ def some_view(request, instance_id):
 
         # Add the new table to the elements list
         elements.append(new_table)
+
+############################################################################################ last 추가시
+        text_between_tables = Paragraph("last", process_style)
+        elements.append(text_between_tables)
+
+        # top_mem_usages = get_process_mem_usage_top5(selected_ip)
+
+        # Define the new table data
+        process_mem_data = [
+            ['Command', 'PID', 'User', 'MEM%']
+        ]
+
+        for i in range(0,5):
+            process_mem_data.append([
+                'command',
+                'pid',
+                'instance_user',
+                'avg_mem_usage'
+            ])
+
+        # Adjust column widths to fit the page width
+        new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
+        new_table = Table(process_mem_data, colWidths=[new_table_col_width] * 2)
+        new_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTNAME', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
+        ]))
+
+        # Add the new table to the elements list
+        elements.append(new_table)
+
+
         elements.append(PageBreak())
 
 

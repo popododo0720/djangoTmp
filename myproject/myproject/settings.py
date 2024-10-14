@@ -53,7 +53,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-X_FRAME_OPTIONS = 'ALLOW-FROM https://192.168.0.22'
+X_FRAME_OPTIONS = 'ALLOW-FROM https://192.168.0.60'
 
 ROOT_URLCONF = 'myproject.urls'
 
@@ -85,31 +85,31 @@ DATABASES = {
         'NAME': 'monitoring_db',          # 데이터베이스 이름
         'USER': 'postgres',          # PostgreSQL 사용자 이름
         'PASSWORD': 'coremax1@#',  # PostgreSQL 사용자 비밀번호
-        'HOST': '192.168.0.42',             # 데이터베이스 서버 주소 (로컬호스트인 경우 'localhost')
+        'HOST': '192.168.0.31',             # 데이터베이스 서버 주소 (로컬호스트인 경우 'localhost')
         'PORT': '5432',                  # PostgreSQL 기본 포트
     },
     'mariadb_nova': {  # MySQL 또는 MariaDB 데이터베이스 설정
         'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
         'NAME': 'nova',  # MariaDB 데이터베이스 이름
         'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'byN0BEXCoEKKrjkukW6YsUYto9OyZPF3KgYJTDVF',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.0.10',  # MariaDB 서버 주소
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
+        'HOST': '10.0.2.110',  # MariaDB 서버 주소
         'PORT': '3306',  # MariaDB 기본 포트
     },
     'mariadb_glance': {  # MySQL 또는 MariaDB 데이터베이스 설정
         'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
         'NAME': 'glance',  # MariaDB 데이터베이스 이름
         'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'byN0BEXCoEKKrjkukW6YsUYto9OyZPF3KgYJTDVF',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.0.10',  # MariaDB 서버 주소
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
+        'HOST': '10.0.2.110',  # MariaDB 서버 주소
         'PORT': '3306',  # MariaDB 기본 포트
     },
     'mariadb_neutron': {  # MySQL 또는 MariaDB 데이터베이스 설정
         'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
         'NAME': 'neutron',  # MariaDB 데이터베이스 이름
         'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'byN0BEXCoEKKrjkukW6YsUYto9OyZPF3KgYJTDVF',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.0.10',  # MariaDB 서버 주소
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
+        'HOST': '10.0.2.110',  # MariaDB 서버 주소
         'PORT': '3306',  # MariaDB 기본 포트
     }
 }
