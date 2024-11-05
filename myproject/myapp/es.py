@@ -42,8 +42,8 @@ def filter_log_levels(buckets):
     log_levels = {
         'INFO': 0,
         'WARN': 0,
-        'FATAL': 0,
-        'ERROR': 0  
+        'ERROR': 0,
+        'FATAL': 0
     }
 
     for bucket in buckets:

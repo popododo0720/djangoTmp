@@ -19,7 +19,7 @@ from django.utils.timezone import make_aware
 from django.urls import reverse
 
 ############################## 테스트
-
+# 표 하나씩 다 나눠져 있는 카피본 
 
     
 def home_view(request):

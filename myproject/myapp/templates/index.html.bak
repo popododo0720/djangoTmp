@@ -58,7 +58,7 @@
         {% for instance in data %}
         <tr>
             <td>{{ instance.created_at|date:"Y-m-d" }}</td>
-            <td>{{ instance.hostname }}</td>
+            <td>{{ instance.display_name }}</td>
             <td>{{ instance.host }}</td>
             <td>{{ instance.uptime }}</td>
             <td>{{ instance.device }}</td>

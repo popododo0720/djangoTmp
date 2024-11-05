@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_extensions',
-    'myapp'
+    'myapp',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
@@ -51,9 +52,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 X_FRAME_OPTIONS = 'ALLOW-FROM https://192.168.0.60'
+
+CSP_FRAME_ANCESTORS = ['https://192.168.0.60',
+                       'https://192.168.0.31']
 
 ROOT_URLCONF = 'myproject.urls'
 
@@ -162,3 +167,8 @@ SECURE_SSL_REDIRECT = True  # 모든 HTTP 요청을 HTTPS로 리다이렉트
 SECURE_HSTS_SECONDS = 3600  # HSTS 설정 (HTTPS 전용)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # 하위 도메인에 HSTS 적용
 SECURE_HSTS_PRELOAD = True  # HSTS Preload 리스트에 추가
+
+CORS_ALLOWED_ORIGINS = [
+    "https://192.168.0.60",
+    "https://192.168.0.31"
+]

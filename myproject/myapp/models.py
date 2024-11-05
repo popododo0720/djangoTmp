@@ -89,3 +89,13 @@ class BlockDeviceMapping(models.Model):
     class Meta:
         managed = False
         db_table = 'block_device_mapping'
+
+class ReportMapping(models.Model):
+    id = models.IntegerField(primary_key=True)
+    display_name = models.CharField()
+    ip_address = models.CharField()
+    report_type = models.CharField()
+
+    class Meta:
+        managed = False
+        db_table = 'report_mapping'  
