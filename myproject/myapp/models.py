@@ -95,6 +95,7 @@ class ReportMapping(models.Model):
     display_name = models.CharField()
     ip_address = models.CharField()
     report_type = models.CharField()
+    instance_uuid = models.CharField(unique=True)
 
     class Meta:
         managed = False

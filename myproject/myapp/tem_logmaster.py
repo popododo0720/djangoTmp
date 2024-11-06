@@ -32,8 +32,16 @@ def categorize(value):
 
 ##############################
 
-def some_view(request, instance_id):
+def logmaster_view(request, instance_id, start_date, end_date):
 
+    start_date_obj_pre = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date_obj_pre = datetime.strptime(end_date, "%Y-%m-%d")
+
+    start_date_obj = timezone.make_aware(start_date_obj_pre, timezone.get_current_timezone())
+    end_date_obj = timezone.make_aware(end_date_obj_pre.replace(hour=23, minute=59, second=59, microsecond=999999), timezone.get_current_timezone())
+
+    print("Start Date:", start_date_obj)
+    print("End Date:", end_date_obj)
     query = '''
         SELECT 
             i.id, 
@@ -90,22 +98,17 @@ def some_view(request, instance_id):
         })
     instance_data = data[0]
 
-    file_path = '/monitoring/serverIp.json'
-    with open(file_path, 'r') as f:
-        targets = json.load(f)
+    ip_mapping_query = get_report_ip_mapping(row[1])
+    ip_addresses = []
 
-    # Find all matching IPs by comparing hostname and name in targets.json
-    matching_ips = []
-    for target in targets:
-        if target['name'] == instance_data['display_name']:
-            matching_ips.append(target['ip'])
+    for entry in ip_mapping_query:
+        if entry.get('ip_address'):
+            ip_addresses.extend(entry['ip_address']) 
 
-    # If no match is found, set a default message or value
-    if not matching_ips:
-        matching_ips = ['']
+    if not ip_addresses:
+        ip_addresses = ['']
 
-    # Join the matching IPs into a single string (comma separated)
-    matching_ip_str = ', '.join(matching_ips)
+    ip_addresses_str = ', '.join(ip_addresses)
 
     # # Create a file-like buffer to receive PDF data.
     buffer = io.BytesIO()   
@@ -120,7 +123,7 @@ def some_view(request, instance_id):
     pdfmetrics.registerFont(TTFont('font', '조선굴림체.TTF'))
 
     # # Title
-    title = "서버 점검 리포트"
+    title = "로그마스터 점검 리포트"
     styles = getSampleStyleSheet()
     title_style = styles['Title']
     title_style.fontName = 'font'
@@ -129,11 +132,8 @@ def some_view(request, instance_id):
     title_style.spaceAfter = 20 
     elements.append(Paragraph(title, title_style))
 
-    now = datetime.now()
-    date_str = now.strftime('%Y년 %m월 %d일 %I:%M')
-
     date_data = [
-        ['IP',  matching_ip_str]
+        ['IP',  ip_addresses_str]
     ]
 #     # Adjust column widths to fit the page width
     page_width = doc.pagesize[0] - 2 * 72  # Page width minus margins
@@ -159,7 +159,7 @@ def some_view(request, instance_id):
 
     # Draw the equipment details table in the desired format
     equipment_data = [
-        ['날짜', '2024-10', 'Uptime', formatted_uptime],
+        ['날짜', start_date + "~" + end_date, 'Uptime', formatted_uptime],
         ['호스트명', displayName, '컨트롤러', instance_data['host']],
         ['image', 'ubuntu', '장치', instance_data['root_device_name']],
         ['VCPU', instance_data['vcpus'], 'MEMORY(mb)', instance_data['memory_mb']],
@@ -183,7 +183,7 @@ def some_view(request, instance_id):
     ############################  추후 모니터링용 대역으로 변경 필요  #####################################
     target_network = ipaddress.ip_network("192.168.0.0/24")
     filtered_ips = [
-        ip for ip in matching_ips 
+        ip for ip in ip_addresses 
         if ip not in ['0', '0.0.0.0'] and ip and ipaddress.ip_address(ip) in target_network
     ]
 
@@ -191,12 +191,12 @@ def some_view(request, instance_id):
     selected_ip = None
 
     if filtered_ips:
-        selected_ip = filtered_ips[0] + ':8088'  # 필터링된 IP 중 첫 번째 IP 선택
+        selected_ip = filtered_ips[0] + ':8088' 
     else:
-        selected_ip = None  # else 블록에서 명시적으로 None을 설정
+        selected_ip = None  
 
     if selected_ip:
-        avg_cpu_usage, avg_mem_usage, avg_disk_size, avg_disk_used = get_resource_usage_averages(selected_ip)
+        avg_cpu_usage, avg_mem_usage, avg_disk_size, avg_disk_used = get_resource_usage_averages(selected_ip, start_date_obj, end_date_obj)
         if avg_disk_size is not None and avg_disk_size > 0:
             disk_usage_percentage = categorize(avg_disk_used / avg_disk_size)
             avg_disk_size_gb = round(avg_disk_size / 1024, 1)
@@ -261,9 +261,6 @@ def some_view(request, instance_id):
         if log_levels_buckets: 
             filtered_log_levels = filter_log_levels(log_levels_buckets)
 
-            # text_between_tables = Paragraph("로그 요약", process_style)
-            # elements.append(text_between_tables)
-
             resource_data = [
                 ['로그 요약']
             ]
@@ -281,9 +278,6 @@ def some_view(request, instance_id):
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
             ]))
             elements.append(resource_table)
-
-
-
 
             resource_data = [
                 ['로그 레벨', '카운트']
@@ -417,7 +411,7 @@ def some_view(request, instance_id):
             ]))
             elements.append(resource_table)
 
-            top_cpu_usages = get_process_cpu_usage_top5(selected_ip)
+            top_cpu_usages = get_process_cpu_usage_top5(selected_ip, start_date_obj, end_date_obj)
 
             # Define the new table data
             process_cpu_data = [
@@ -471,7 +465,7 @@ def some_view(request, instance_id):
             ]))
             elements.append(resource_table)
 
-            top_mem_usages = get_process_mem_usage_top5(selected_ip)
+            top_mem_usages = get_process_mem_usage_top5(selected_ip, start_date_obj, end_date_obj)
 
             # Define the new table data
             process_mem_data = [
@@ -529,7 +523,7 @@ def some_view(request, instance_id):
             ]))
             elements.append(resource_table)
 
-            top_port_usages = get_unique_port_usage(selected_ip)
+            top_port_usages = get_unique_port_usage(selected_ip, start_date_obj, end_date_obj)
 
             # Define the new table data
             port_data = [

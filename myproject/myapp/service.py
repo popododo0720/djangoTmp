@@ -3,10 +3,10 @@ from django.utils import timezone
 from django.db.models import Avg
 from .models import *
 
-start_date = timezone.make_aware(datetime(2024, 10, 1, 0, 0, 0))
-end_date = timezone.make_aware(datetime(2024, 10, 30, 23, 59, 59))
+start_date = timezone.make_aware(datetime(2024, 10, 1))
+end_date = timezone.make_aware(datetime(2024, 10, 30))
 
-def get_resource_usage_averages(instance_ip):
+def get_resource_usage_averages(instance_ip, start_date, end_date):
     # CPU 사용량 평균 
     cpu_data = CpuUsage.objects.filter(
         timestamp__range=(start_date, end_date),
@@ -38,7 +38,7 @@ def get_resource_usage_averages(instance_ip):
 
     return avg_cpu_usage_value, avg_mem_usage_value, avg_disk_size_value, avg_disk_used_value
 
-def get_process_cpu_usage_top5(instance_ip):
+def get_process_cpu_usage_top5(instance_ip, start_date, end_date):
     top_cpu_usages = InstanceProcessCpu.objects.filter(
         instance=instance_ip,
         timestamp__range=(start_date, end_date)
@@ -52,7 +52,7 @@ def get_process_cpu_usage_top5(instance_ip):
 
     return top_cpu_usages
 
-def get_process_mem_usage_top5(instance_ip):
+def get_process_mem_usage_top5(instance_ip, start_date, end_date):
     top_mem_usages = InstanceProcessMem.objects.filter(
         instance=instance_ip,
         timestamp__range=(start_date, end_date)
@@ -67,10 +67,7 @@ def get_process_mem_usage_top5(instance_ip):
     return top_mem_usages
 
 
-def get_unique_port_usage(instance_ip):
-    start_date = timezone.make_aware(datetime(2024, 10, 1, 0, 0, 0))
-    end_date = timezone.make_aware(datetime(2024, 10, 30, 23, 59, 59))
-
+def get_unique_port_usage(instance_ip, start_date, end_date):
     unique_port_usages = (
         InstancePortMem.objects.filter(
             instance=instance_ip,
@@ -82,13 +79,13 @@ def get_unique_port_usage(instance_ip):
 
     return unique_port_usages
 
-def get_report_ip_mapping(displayname):
-    unique_port_usages = (
+def get_report_ip_mapping(instanceUuid):
+    reportMapping = (
         ReportMapping.objects.filter(
-            display_name=displayname,
+            instance_uuid=instanceUuid,
         )
-        .values('ip_address') 
+        .values('ip_address','report_type') 
         .distinct() 
     )
 
-    return unique_port_usages
+    return reportMapping

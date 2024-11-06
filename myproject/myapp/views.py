@@ -1,22 +1,12 @@
-from django.http import FileResponse
-from django.shortcuts import render
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import pdfmetrics
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
 from myapp.service import *
 from .es import *
-from django.conf import settings
-from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.db import connections
-from datetime import datetime
 from django.utils.timezone import make_aware
 from django.urls import reverse
 from django.http import JsonResponse
-
+from .tem_basic import *
+from .tem_logmaster import *
     
 def home_view(request):
 
@@ -33,7 +23,7 @@ def home_view(request):
             i.root_device_name,
             i.vcpus,
             i.memory_mb,
-            b.instance_uuid 
+            i.uuid
         FROM 
             instances i 
         JOIN 
@@ -61,13 +51,18 @@ def home_view(request):
         minutes = (uptime.seconds // 60) % 60 
         formatted_uptime = f"{days} days, {hours}:{minutes}"
 
-        ip_mapping = get_report_ip_mapping(row[1])
+        ip_mapping_query = get_report_ip_mapping(row[9])
+        ip_addresses = []
+        report_type = ""
 
-        if not ip_mapping.exists():  
-            ip_addresses_str = "" 
-        else:
-            ip_addresses = ip_mapping.values_list('ip_address', flat=True)
-            ip_addresses_str = ', '.join(ip_addresses[0]) if ip_addresses else ""
+        for entry in ip_mapping_query:
+            if entry.get('ip_address'):
+                ip_addresses.extend(entry['ip_address']) 
+            if entry.get('report_type'):
+                report_type = entry['report_type'] 
+
+        ip_addresses_str = ', '.join(ip_addresses) if ip_addresses else ""
+        report_type = report_type or "default"
 
         data.append({
             'id': row[0],
@@ -82,10 +77,51 @@ def home_view(request):
             'instance_uuid': row[9],
             'image': "ubuntu",
             'ip_addresses': ip_addresses_str,
-            'pdf_url': reverse('some_view', args=[row[0]])
+            'report_type': report_type,
         })
 
     return JsonResponse({'data': data})
 
+def report_view(request, instanceUuid):
 
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    query = '''
+            SELECT 
+            i.id
+        FROM 
+            instances i 
+        WHERE
+            i.vm_state = 'active' AND i.uuid = %s;
+            '''
+
+    with connections['mariadb_nova'].cursor() as cursor:
+        cursor.execute(query, [instanceUuid])
+        rows = cursor.fetchall()
+
+    instanceId = rows[0][0]
+    ip_mapping_query = get_report_ip_mapping(instanceUuid)
+    ip_addresses = []
+    reportType = "default"
+
+    for entry in ip_mapping_query:
+        if entry.get('ip_address'):
+            ip_addresses.extend(entry['ip_address']) 
+        if entry.get('report_type'):
+            reportType = entry['report_type']
+
+    if not ip_addresses:
+        ip_addresses = ['']
+            
+    match reportType:
+        case 'logmaster':
+            response = logmaster_view(request, instanceId, start_date, end_date)
+        case _:
+            response = basic_view(request, instanceId, start_date, end_date)
         
+    print(instanceId)
+    print(reportType)
+    print(ip_mapping_query)
+    print(start_date + " " + end_date)
+    return response
