@@ -14,17 +14,10 @@ from pathlib import Path
 from elasticsearch import Elasticsearch
 import os
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-!08qm@gmvvk8=yqb6*5fo+jvca4(a@*ml3=wld^l8f3_pbwb$7'
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
@@ -87,35 +80,35 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'monitoring_db',          # 데이터베이스 이름
-        'USER': 'postgres',          # PostgreSQL 사용자 이름
-        'PASSWORD': 'coremax1@#',  # PostgreSQL 사용자 비밀번호
-        'HOST': '192.168.0.31',             # 데이터베이스 서버 주소 (로컬호스트인 경우 'localhost')
-        'PORT': '5432',                  # PostgreSQL 기본 포트
+        'NAME': 'monitoring_db',         
+        'USER': 'postgres',         
+        'PASSWORD': 'coremax1@#', 
+        'HOST': '192.168.0.31',            
+        'PORT': '5432',                  
     },
-    'mariadb_nova': {  # MySQL 또는 MariaDB 데이터베이스 설정
-        'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
-        'NAME': 'nova',  # MariaDB 데이터베이스 이름
-        'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.2.110',  # MariaDB 서버 주소
-        'PORT': '3306',  # MariaDB 기본 포트
+    'mariadb_nova': {  
+        'ENGINE': 'django.db.backends.mysql',  
+        'NAME': 'nova',  
+        'USER': 'root',  
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  
+        'HOST': '10.0.2.110', 
+        'PORT': '3306',  
     },
-    'mariadb_glance': {  # MySQL 또는 MariaDB 데이터베이스 설정
-        'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
-        'NAME': 'glance',  # MariaDB 데이터베이스 이름
-        'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.2.110',  # MariaDB 서버 주소
-        'PORT': '3306',  # MariaDB 기본 포트
+    'mariadb_glance': {  
+        'ENGINE': 'django.db.backends.mysql', 
+        'NAME': 'glance',  
+        'USER': 'root',  
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  
+        'HOST': '10.0.2.110',  
+        'PORT': '3306',  
     },
-    'mariadb_neutron': {  # MySQL 또는 MariaDB 데이터베이스 설정
-        'ENGINE': 'django.db.backends.mysql',  # MySQL/MariaDB 엔진
-        'NAME': 'neutron',  # MariaDB 데이터베이스 이름
-        'USER': 'root',  # MariaDB 사용자 이름
-        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw',  # MariaDB 사용자 비밀번호
-        'HOST': '10.0.2.110',  # MariaDB 서버 주소
-        'PORT': '3306',  # MariaDB 기본 포트
+    'mariadb_neutron': {  
+        'ENGINE': 'django.db.backends.mysql', 
+        'NAME': 'neutron', 
+        'USER': 'root', 
+        'PASSWORD': 'bcyEm8dQ0c43TbsZzWX7HFpn6ddsEmYb7Saiewfw', 
+        'HOST': '10.0.2.110',  
+        'PORT': '3306', 
     }
 }
 
@@ -163,10 +156,10 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # settings.py
-SECURE_SSL_REDIRECT = True  # 모든 HTTP 요청을 HTTPS로 리다이렉트
-SECURE_HSTS_SECONDS = 3600  # HSTS 설정 (HTTPS 전용)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # 하위 도메인에 HSTS 적용
-SECURE_HSTS_PRELOAD = True  # HSTS Preload 리스트에 추가
+SECURE_SSL_REDIRECT = True  
+SECURE_HSTS_SECONDS = 3600  
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True 
+SECURE_HSTS_PRELOAD = True 
 
 CORS_ALLOWED_ORIGINS = [
     "https://192.168.0.60",

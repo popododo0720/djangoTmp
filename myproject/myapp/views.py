@@ -9,6 +9,7 @@ from .tem_basic import *
 from .tem_other import *
 from .tem_test import *
 from django.http import HttpResponse
+import requests
     
 def home_view(request):
 
@@ -40,19 +41,31 @@ def home_view(request):
         cursor.execute(query)
         rows = cursor.fetchall()
 
+    prometheus_url = 'http://10.0.2.110:9091/api/v1/targets'
+    auth = ('admin', 'JOBdRRi8IvBPnmSdxZ1V7tum15VfaJcVkQ5zigZ6')
+
+    try:
+        response = requests.get(prometheus_url, auth=auth)
+        response.raise_for_status()  
+        targets_data = response.json()  
+        
+        targets = targets_data.get('data', {}).get('activeTargets', [])
+
+        prometheus_targets = []
+        for target in targets:
+            job = target.get('labels', {}).get('job', '')
+            if job == 'custom_exporter' and target.get('health', 'N/A') == 'up':  
+                instance = target.get('labels', {}).get('instance')
+                ip_address = instance.split(':')[0] if instance else ''
+                if ip_address:
+                    prometheus_targets.append(ip_address)
+    except requests.RequestException as e:
+        prometheus_targets = {'error': str(e)}
+    
+    print(prometheus_targets)
+
     data = []
     for row in rows:
-        updated_at = row[5]
-
-        if updated_at.tzinfo is None:
-            updated_at = make_aware(updated_at)
-
-        uptime = current_time - updated_at
-        days = uptime.days
-        hours = (uptime.seconds // 3600) % 24
-        minutes = (uptime.seconds // 60) % 60 
-        formatted_uptime = f"{days} days, {hours}:{minutes}"
-
         ip_mapping_query = get_report_ip_mapping(row[9])
         ip_addresses = []
         report_type = ""
@@ -65,6 +78,23 @@ def home_view(request):
 
         ip_addresses_str = ', '.join(ip_addresses) if ip_addresses else ""
         report_type = report_type or "default"
+
+        if not any(ip in prometheus_targets for ip in ip_addresses):
+            print(ip_addresses)  
+            continue
+
+        updated_at = row[5]
+
+        if updated_at.tzinfo is None:
+            updated_at = make_aware(updated_at)
+
+        uptime = current_time - updated_at
+        days = uptime.days
+        hours = (uptime.seconds // 3600) % 24
+        minutes = (uptime.seconds // 60) % 60 
+        formatted_uptime = f"{days} days, {hours}:{minutes}"
+
+        
 
         data.append({
             'id': row[0],
