@@ -32,7 +32,7 @@ def categorize(value):
 
 ##############################
 
-def logmaster_view(request, instance_id, start_date, end_date):
+def template_view(request, instance_id, reportType, start_date, end_date):
 
     start_date_obj_pre = datetime.strptime(start_date, "%Y-%m-%d")
     end_date_obj_pre = datetime.strptime(end_date, "%Y-%m-%d")
@@ -40,8 +40,6 @@ def logmaster_view(request, instance_id, start_date, end_date):
     start_date_obj = timezone.make_aware(start_date_obj_pre, timezone.get_current_timezone())
     end_date_obj = timezone.make_aware(end_date_obj_pre.replace(hour=23, minute=59, second=59, microsecond=999999), timezone.get_current_timezone())
 
-    print("Start Date:", start_date_obj)
-    print("End Date:", end_date_obj)
     query = '''
         SELECT 
             i.id, 
@@ -53,7 +51,7 @@ def logmaster_view(request, instance_id, start_date, end_date):
             i.root_device_name,
             i.vcpus,
             i.memory_mb,
-            b.instance_uuid 
+            i.uuid 
         FROM 
             instances i 
         JOIN 
@@ -98,7 +96,7 @@ def logmaster_view(request, instance_id, start_date, end_date):
         })
     instance_data = data[0]
 
-    ip_mapping_query = get_report_ip_mapping(row[1])
+    ip_mapping_query = get_report_ip_mapping(row[9])
     ip_addresses = []
 
     for entry in ip_mapping_query:
@@ -109,6 +107,15 @@ def logmaster_view(request, instance_id, start_date, end_date):
         ip_addresses = ['']
 
     ip_addresses_str = ', '.join(ip_addresses)
+
+    report_type_query = get_report_type(reportType)
+        
+    if report_type_query:
+        for item in report_type_query:
+            engineName = item['engine_name']  
+            engineInfo = item['engine_info']
+
+    ###################################### 보고서 #########################################
 
     # # Create a file-like buffer to receive PDF data.
     buffer = io.BytesIO()   
@@ -123,7 +130,7 @@ def logmaster_view(request, instance_id, start_date, end_date):
     pdfmetrics.registerFont(TTFont('font', '조선굴림체.TTF'))
 
     # # Title
-    title = "로그마스터 점검 리포트"
+    title = f"{engineName} 점검 리포트"
     styles = getSampleStyleSheet()
     title_style = styles['Title']
     title_style.fontName = 'font'
@@ -180,7 +187,7 @@ def logmaster_view(request, instance_id, start_date, end_date):
     ]))
     elements.append(equipment_table)
 
-    ############################  추후 모니터링용 대역으로 변경 필요  #####################################
+    ############################  모니터링용 대역으로 변경  #####################################
     target_network = ipaddress.ip_network("192.168.0.0/24")
     filtered_ips = [
         ip for ip in ip_addresses 
@@ -256,16 +263,49 @@ def logmaster_view(request, instance_id, start_date, end_date):
         today_date = datetime.now().strftime("%Y.%m")
         index_pattern = f"{ip_suffix}syslog_logs_{today_date}*"
 
-        log_levels_buckets = fetch_log_levels(index_pattern)
-
+        log_levels_buckets = fetch_log_levels_for_date_range(selected_ip, start_date_obj, end_date_obj)
+       
         if log_levels_buckets: 
-            filtered_log_levels = filter_log_levels(log_levels_buckets)
-
             resource_data = [
                 ['로그 요약']
             ]
 
-            # Adjust column widths to fit the page width
+            resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
+            resource_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 0), (-1, -1), 'font'),
+                ('FONTSIZE', (0, 0), (-1, -1), 13),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),  
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10), 
+            ]))
+            elements.append(resource_table)
+
+            resource_data = [
+                ['로그 레벨', '카운트']
+            ]
+            for log in log_levels_buckets:
+                resource_data.append([log['level'], str(log['count'])])
+
+            main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
+            main_process_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 0), (-1, -1), 'font'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),  
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6), 
+            ]))
+            elements.append(main_process_table)
+
+            resource_data = [
+                ['엔진 상태']
+            ]
+
             resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
             resource_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -279,13 +319,25 @@ def logmaster_view(request, instance_id, start_date, end_date):
             ]))
             elements.append(resource_table)
 
-            resource_data = [
-                ['로그 레벨', '카운트']
-            ]
-            for log in filtered_log_levels:
-                resource_data.append([log['level'], str(log['count'])])
+            date_diff = (end_date_obj.date() - start_date_obj.date()).days
+            
+            for engines in engineInfo:
+                engineCount, engineOn5m = get_count_for_command(engines, selected_ip, start_date_obj, end_date_obj)
+                if len(engines) > 80:
+                    engines = '...' + engines[-77:]
 
-            main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
+                if (engineCount > (1400 * (date_diff + 1))) & engineOn5m:
+                    engineStatus = '정상'
+                else:
+                    engineStatus = "비정상"
+
+                print(date_diff)
+                print(engineCount)
+                print(1400 * (date_diff + 1))
+                print(engineOn5m)
+                resource_data.append([engines, engineStatus])
+            
+            main_process_table = Table(resource_data, colWidths=[equipment_col_width*3, equipment_col_width])
             main_process_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONT', (0, 0), (-1, -1), 'font'),
@@ -297,30 +349,6 @@ def logmaster_view(request, instance_id, start_date, end_date):
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
             ]))
             elements.append(main_process_table)
-
-            # text_between_tables = Paragraph("주요 프로세스", process_style)
-            # elements.append(text_between_tables)
-
-            # resource_data = [
-            #     ['주요1', '11'],  
-            #     ['주요2', '22'], 
-            #     ['주요3', '33'],
-            #     ['주요4', '44'],
-            #     ['주요5', '55']
-            # ]
-
-            # main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
-            # main_process_table.setStyle(TableStyle([
-            #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            #     ('FONT', (0, 0), (-1, -1), 'font'),
-            #     ('FONTSIZE', (0, 1), (-1, -1), 10),
-            #     ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-            #     ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            #     ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            #     ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-            #     ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
-            # ]))
-            # elements.append(main_process_table)
 
 
         elements.append(PageBreak())
@@ -502,9 +530,6 @@ def logmaster_view(request, instance_id, start_date, end_date):
 
 ##############################################################################################################################################
 
-            # text_between_tables = Paragraph("사용 포트", process_style)
-            # elements.append(text_between_tables)
-
             resource_data = [
                 ['사용 포트']
             ]
@@ -525,7 +550,6 @@ def logmaster_view(request, instance_id, start_date, end_date):
 
             top_port_usages = get_unique_port_usage(selected_ip, start_date_obj, end_date_obj)
 
-            # Define the new table data
             port_data = [
                 ['Local', 'Peer', 'State', 'RecvQ', 'SendQ']
             ]
@@ -587,5 +611,8 @@ def logmaster_view(request, instance_id, start_date, end_date):
     pdf = buffer.getvalue()
     buffer.close()
 
+    print(start_date_obj)
+    print(end_date_obj)
+    print(engineName)
     response = FileResponse(io.BytesIO(pdf), as_attachment=True, filename='instance_report.pdf')
     return response

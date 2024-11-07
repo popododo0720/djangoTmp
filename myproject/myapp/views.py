@@ -6,7 +6,9 @@ from django.utils.timezone import make_aware
 from django.urls import reverse
 from django.http import JsonResponse
 from .tem_basic import *
-from .tem_logmaster import *
+from .tem_other import *
+from .tem_test import *
+from django.http import HttpResponse
     
 def home_view(request):
 
@@ -82,7 +84,11 @@ def home_view(request):
 
     return JsonResponse({'data': data})
 
+###########################################################################################
+
 def report_view(request, instanceUuid):
+    func_start_time = datetime.now() 
+    print("함수 시작 시간:", func_start_time)
 
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -113,15 +119,15 @@ def report_view(request, instanceUuid):
 
     if not ip_addresses:
         ip_addresses = ['']
-            
-    match reportType:
-        case 'logmaster':
-            response = logmaster_view(request, instanceId, start_date, end_date)
-        case _:
-            response = basic_view(request, instanceId, start_date, end_date)
+
+    # response = test_view(request, instanceId, start_date, end_date)
+
+    if(reportType=='default'):
+        response = basic_view(request, instanceId, start_date, end_date)
+    else:
+        response = template_view(request, instanceId, reportType, start_date, end_date)
+
+    func_end_time = datetime.now() 
+    print("함수 끝나는 시간:", func_end_time)
         
-    print(instanceId)
-    print(reportType)
-    print(ip_mapping_query)
-    print(start_date + " " + end_date)
     return response

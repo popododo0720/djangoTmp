@@ -51,7 +51,7 @@ def basic_view(request, instance_id, start_date, end_date):
             i.root_device_name,
             i.vcpus,
             i.memory_mb,
-            b.instance_uuid 
+            i.uuid 
         FROM 
             instances i 
         JOIN 
@@ -96,7 +96,7 @@ def basic_view(request, instance_id, start_date, end_date):
         })
     instance_data = data[0]
 
-    ip_mapping_query = get_report_ip_mapping(row[1])
+    ip_mapping_query = get_report_ip_mapping(row[9])
     ip_addresses = []
 
     for entry in ip_mapping_query:
@@ -249,16 +249,9 @@ def basic_view(request, instance_id, start_date, end_date):
         process_style.spaceAfter = 10  # Space after paragraph
         process_style.alignment = 1  # Center-align text
 
-        
-        ip_suffix = selected_ip.split(':')[0].split('.')[-1]
-        today_date = datetime.now().strftime("%Y.%m")
-        index_pattern = f"{ip_suffix}syslog_logs_{today_date}*"
-
-        log_levels_buckets = fetch_log_levels(index_pattern)
-
+        log_levels_buckets = fetch_log_levels_for_date_range(selected_ip, start_date_obj, end_date_obj)
+       
         if log_levels_buckets: 
-            filtered_log_levels = filter_log_levels(log_levels_buckets)
-
             resource_data = [
                 ['로그 요약']
             ]
@@ -280,7 +273,7 @@ def basic_view(request, instance_id, start_date, end_date):
             resource_data = [
                 ['로그 레벨', '카운트']
             ]
-            for log in filtered_log_levels:
+            for log in log_levels_buckets:
                 resource_data.append([log['level'], str(log['count'])])
 
             main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
@@ -295,31 +288,6 @@ def basic_view(request, instance_id, start_date, end_date):
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
             ]))
             elements.append(main_process_table)
-
-            # text_between_tables = Paragraph("주요 프로세스", process_style)
-            # elements.append(text_between_tables)
-
-            # resource_data = [
-            #     ['주요1', '11'],  
-            #     ['주요2', '22'], 
-            #     ['주요3', '33'],
-            #     ['주요4', '44'],
-            #     ['주요5', '55']
-            # ]
-
-            # main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
-            # main_process_table.setStyle(TableStyle([
-            #     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            #     ('FONT', (0, 0), (-1, -1), 'font'),
-            #     ('FONTSIZE', (0, 1), (-1, -1), 10),
-            #     ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-            #     ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            #     ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            #     ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-            #     ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
-            # ]))
-            # elements.append(main_process_table)
-
 
         elements.append(PageBreak())
 

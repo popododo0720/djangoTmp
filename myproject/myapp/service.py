@@ -2,9 +2,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db.models import Avg
 from .models import *
-
-start_date = timezone.make_aware(datetime(2024, 10, 1))
-end_date = timezone.make_aware(datetime(2024, 10, 30))
+from datetime import timedelta
 
 def get_resource_usage_averages(instance_ip, start_date, end_date):
     # CPU 사용량 평균 
@@ -89,3 +87,34 @@ def get_report_ip_mapping(instanceUuid):
     )
 
     return reportMapping
+
+def get_report_type(reportType):
+    reportTypeMapping = (
+        ReportTypes.objects.filter(
+            report_type=reportType,
+        )
+        .values('engine_name', 'engine_info')
+        .distinct()
+    )
+    return reportTypeMapping
+
+def get_count_for_command(command, instance, start_date, end_date):
+    count = InstanceProcessCpu.objects.filter(
+        command=command,
+        instance=instance,
+        timestamp__range=(start_date, end_date)
+    ).count()
+
+    closest_entry = InstanceProcessCpu.objects.filter(
+        command=command,
+        instance=instance,
+        timestamp__range=(start_date, end_date)
+    ).order_by('timestamp').last()
+
+    if closest_entry.timestamp.tzinfo is None:
+        closest_entry.timestamp = timezone.make_aware(closest_entry.timestamp, timezone.get_current_timezone())
+    
+    time_difference = abs(closest_entry.timestamp - end_date)
+    is_within_5_minutes = time_difference <= timedelta(minutes=5)
+    
+    return count, is_within_5_minutes

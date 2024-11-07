@@ -100,3 +100,13 @@ class ReportMapping(models.Model):
     class Meta:
         managed = False
         db_table = 'report_mapping'  
+
+class ReportTypes(models.Model):
+    id = models.IntegerField(primary_key=True)
+    report_type = models.CharField(unique=True)
+    engine_name = models.CharField(blank=True)
+    engine_info = models.CharField(blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'report_types'  
