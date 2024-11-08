@@ -32,7 +32,7 @@ def categorize(value):
 
 ##############################
 
-def test_view(request, instance_id, start_date, end_date):
+def test_view(request, instance_id, reportType, start_date, end_date):
 
 
     print("@@@@@@@@@@@@@@@@@test@@@@@@@@@@@@@@@")
@@ -110,6 +110,13 @@ def test_view(request, instance_id, start_date, end_date):
         ip_addresses = ['']
 
     ip_addresses_str = ', '.join(ip_addresses)
+    report_type_query = get_report_type(reportType)
+        
+    if report_type_query:
+        for item in report_type_query:
+            engineName = item['engine_name']  
+            engineInfo = item['engine_info']
+###################################### 보고서 #########################################
 
     # # Create a file-like buffer to receive PDF data.
     buffer = io.BytesIO()   
@@ -195,9 +202,15 @@ def test_view(request, instance_id, start_date, end_date):
         selected_ip = filtered_ips[0] + ':8088' 
     else:
         selected_ip = None  
-
+  
     if selected_ip:
+        print("#### avg fetch")
+        print("start: ")
+        print(datetime.now())
         avg_cpu_usage, avg_mem_usage, avg_disk_size, avg_disk_used = get_resource_usage_averages(selected_ip, start_date_obj, end_date_obj)
+        print("end: ")
+        print(datetime.now())
+
         if avg_disk_size is not None and avg_disk_size > 0:
             disk_usage_percentage = categorize(avg_disk_used / avg_disk_size)
             avg_disk_size_gb = round(avg_disk_size / 1024, 1)
@@ -223,80 +236,58 @@ def test_view(request, instance_id, start_date, end_date):
         ]))
         elements.append(resource_table)
 
-
-        resource_data = [
-            ['CPU', categorize(avg_cpu_usage)],  # 두 번째 줄: 1칸과 3칸 크기로 나누어 배치
-            ['MEM', categorize(avg_mem_usage)],  # 세 번째 줄: 1칸과 3칸 크기로 나누어 배치
-            ['DISK', disk_usage_percentage]
-        ]
-
-        # Adjust column widths to fit the page width
-        resource_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
-        resource_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONT', (0, 0), (-1, -1), 'font'),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
-        ]))
-        elements.append(resource_table)
-
-        process_style = styles['Normal']
-        process_style.fontName = 'font'
-        process_style.fontSize = 12
-        process_style.leading = 12  # Line height
-        process_style.spaceBefore = 10
-        process_style.spaceAfter = 10  # Space after paragraph
-        process_style.alignment = 1  # Center-align text
-
-        
         ip_suffix = selected_ip.split(':')[0].split('.')[-1]
         today_date = datetime.now().strftime("%Y.%m")
+        index_pattern = f"{ip_suffix}syslog_logs_{today_date}*"
 
+        print("#### log fetch")
+        print("start: ")
+        print(datetime.now())
         log_levels_buckets = fetch_log_levels_for_date_range(selected_ip, start_date_obj, end_date_obj)
+        print("end: ")
+        print(datetime.now())
        
-        if log_levels_buckets: 
-            resource_data = [
-                ['로그 요약']
-            ]
+        date_diff = (end_date_obj.date() - start_date_obj.date()).days
+            
+        for engines in engineInfo:
+            print("#### engine")
+            print("start: ")
+            print(datetime.now())
+            engineCount, engineOn5m = get_count_for_command(engines, selected_ip, start_date_obj, end_date_obj)
+            print("end: ")
+            print(datetime.now())
+       
+            if len(engines) > 80:
+                engines = '...' + engines[-77:]
 
-            resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
-            resource_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 13),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10), 
-            ]))
-            elements.append(resource_table)
+            if (engineCount > (1400 * (date_diff + 1))) & engineOn5m:
+                engineStatus = '정상'
+            else:
+                engineStatus = "비정상"
 
-            resource_data = [
-                ['로그 레벨', '카운트']
-            ]
-            for log in log_levels_buckets:
-                resource_data.append([log['level'], str(log['count'])])
-
-            main_process_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
-            main_process_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  
-                ('BOTTOMPADDING', (0, 1), (-1, -1), 6), 
-            ]))
-            elements.append(main_process_table)
-
-        elements.append(PageBreak())
-
+            print(date_diff)
+            print(engineCount)
+            print(1400 * (date_diff + 1))
+            print(engineOn5m)
+        if avg_cpu_usage is not None:   
+            print("#### cpu5 fetch")
+            print("start: ")
+            print(datetime.now())
+            top_cpu_usages = get_process_cpu_usage_top5(selected_ip, start_date_obj, end_date_obj)
+            print("end: ")
+            print(datetime.now())
+            print("#### mem5 fetch")
+            print("start: ")
+            print(datetime.now())
+            top_mem_usages = get_process_mem_usage_top5(selected_ip, start_date_obj, end_date_obj)
+            print("end: ")
+            print(datetime.now())
+            print("#### port fetch")
+            print("start: ")
+            print(datetime.now())
+            top_port_usages = get_unique_port_usage(selected_ip, start_date_obj, end_date_obj)
+            print("end: ")
+            print(datetime.now())
 
     # Build PDF
     doc.build(elements)

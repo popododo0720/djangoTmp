@@ -62,8 +62,6 @@ def home_view(request):
     except requests.RequestException as e:
         prometheus_targets = {'error': str(e)}
     
-    print(prometheus_targets)
-
     data = []
     for row in rows:
         ip_mapping_query = get_report_ip_mapping(row[9])
@@ -80,9 +78,8 @@ def home_view(request):
         report_type = report_type or "default"
 
         if not any(ip in prometheus_targets for ip in ip_addresses):
-            print(ip_addresses)  
             continue
-
+ 
         updated_at = row[5]
 
         if updated_at.tzinfo is None:
@@ -117,9 +114,6 @@ def home_view(request):
 ###########################################################################################
 
 def report_view(request, instanceUuid):
-    func_start_time = datetime.now() 
-    print("함수 시작 시간:", func_start_time)
-
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
 
@@ -140,7 +134,7 @@ def report_view(request, instanceUuid):
     ip_mapping_query = get_report_ip_mapping(instanceUuid)
     ip_addresses = []
     reportType = "default"
-
+ 
     for entry in ip_mapping_query:
         if entry.get('ip_address'):
             ip_addresses.extend(entry['ip_address']) 
@@ -149,15 +143,12 @@ def report_view(request, instanceUuid):
 
     if not ip_addresses:
         ip_addresses = ['']
-
-    # response = test_view(request, instanceId, start_date, end_date)
+    
+    # response = test_view(request, instanceId, reportType, start_date, end_date)
 
     if(reportType=='default'):
         response = basic_view(request, instanceId, start_date, end_date)
     else:
         response = template_view(request, instanceId, reportType, start_date, end_date)
-
-    func_end_time = datetime.now() 
-    print("함수 끝나는 시간:", func_end_time)
         
     return response

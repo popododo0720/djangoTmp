@@ -16,6 +16,7 @@ from datetime import datetime
 from django.utils.timezone import make_aware
 from django.urls import reverse
 import ipaddress
+import threading
 
 def truncate_text(text, max_length):
     return text if len(text) <= max_length else text[:max_length] + '...'
@@ -29,6 +30,26 @@ def categorize(value):
             return '중 (70% 이하)'
         else:
             return '상 (70% 초과)'
+
+def report_engine(engines, selected_ip, start_date_obj, end_date_obj, lock, resource_data):
+    # get_count_for_command 함수 호출
+    engineCount, engineOn5m = get_count_for_command(engines, selected_ip, start_date_obj, end_date_obj)
+
+    # 엔진 이름이 80자를 초과하면 잘라내기
+    if len(engines) > 80:
+        engines = '...' + engines[-77:]
+
+    date_diff = (end_date_obj.date() - start_date_obj.date()).days
+
+    # 상태 결정
+    if (engineCount > (1400 * (date_diff + 1))) & engineOn5m:
+        engineStatus = '정상'
+    else:
+        engineStatus = "비정상"
+
+    # Lock을 사용하여 resource_data에 안전하게 추가
+    with lock:
+        resource_data.append([engines, engineStatus])
 
 ##############################
 
@@ -319,24 +340,20 @@ def template_view(request, instance_id, reportType, start_date, end_date):
             ]))
             elements.append(resource_table)
 
-            date_diff = (end_date_obj.date() - start_date_obj.date()).days
+            resource_data = []
+            lock = threading.Lock()  # Lock 객체 생성
+            threads = []
             
             for engines in engineInfo:
-                engineCount, engineOn5m = get_count_for_command(engines, selected_ip, start_date_obj, end_date_obj)
-                if len(engines) > 80:
-                    engines = '...' + engines[-77:]
+                thread = threading.Thread(target=report_engine, args=(engines, selected_ip, start_date_obj, end_date_obj, lock, resource_data))
+                threads.append(thread)
+                thread.start()  
 
-                if (engineCount > (1400 * (date_diff + 1))) & engineOn5m:
-                    engineStatus = '정상'
-                else:
-                    engineStatus = "비정상"
-
-                print(date_diff)
-                print(engineCount)
-                print(1400 * (date_diff + 1))
-                print(engineOn5m)
-                resource_data.append([engines, engineStatus])
+            for thread in threads:
+                thread.join()
             
+            resource_data.sort(key=lambda x: x[0])
+
             main_process_table = Table(resource_data, colWidths=[equipment_col_width*3, equipment_col_width])
             main_process_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -354,179 +371,177 @@ def template_view(request, instance_id, reportType, start_date, end_date):
         elements.append(PageBreak())
 
 # ################################################################################################################################ 다음페이지
-        if avg_cpu_usage is not None:    
-            resource_data = [
-                ['자원사용량']
-            ]
+        resource_data = [
+            ['자원사용량']
+        ]
 
-            # Adjust column widths to fit the page width
-            resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
-            resource_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 13),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
-            ]))
-            elements.append(resource_table)
-            
+        resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
+        resource_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 13),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
+        ]))
+        elements.append(resource_table)
+        
 
-            # Resource Usage Table
-            resource_data = [
-                ['CPU', f'{avg_cpu_usage:.1f}%'],  # 두 번째 줄: 1칸과 3칸 크기로 나누어 배치
-                ['MEM', f'{avg_mem_usage:.1f}%'],  # 세 번째 줄: 1칸과 3칸 크기로 나누어 배치
-            ]
+        # Resource Usage Table
+        resource_data = [
+            ['CPU', f'{avg_cpu_usage:.1f}%'],  # 두 번째 줄: 1칸과 3칸 크기로 나누어 배치
+            ['MEM', f'{avg_mem_usage:.1f}%'],  # 세 번째 줄: 1칸과 3칸 크기로 나누어 배치
+        ]
 
-            # Adjust column widths to fit the page width
-            resource_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
-            resource_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.white),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
-            ]))
-            elements.append(resource_table)
+        # Adjust column widths to fit the page width
+        resource_table = Table(resource_data, colWidths=[equipment_col_width, equipment_col_width * 3])
+        resource_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.white),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),  # Increase bottom padding
+        ]))
+        elements.append(resource_table)
 
-            # Draw the DISK details table
-            disk_data = [
-                ['DISK', 'Mount', 'Size', 'Used', 'Avail', 'Use %'],
-                ['', '/', f'{avg_disk_size_gb}GB', f'{avg_disk_used_gb}GB', f'{round(avg_disk_size_gb - avg_disk_used_gb, 1)}GB', f'{int((avg_disk_used_gb/avg_disk_size_gb)*100)}%']
-            ]
+        # Draw the DISK details table
+        disk_data = [
+            ['DISK', 'Mount', 'Size', 'Used', 'Avail', 'Use %'],
+            ['', '/', f'{avg_disk_size_gb}GB', f'{avg_disk_used_gb}GB', f'{round(avg_disk_size_gb - avg_disk_used_gb, 1)}GB', f'{int((avg_disk_used_gb/avg_disk_size_gb)*100)}%']
+        ]
 
-            # Adjust column widths: 
-            # - DISK takes 1/4 of the width (same as previous single columns)
-            # - The remaining 3/4 is divided into 5 equal parts
-            disk_col_widths = [equipment_col_width] + [equipment_col_width * 3 / 5] * 5
+        # Adjust column widths: 
+        # - DISK takes 1/4 of the width (same as previous single columns)
+        # - The remaining 3/4 is divided into 5 equal parts
+        disk_col_widths = [equipment_col_width] + [equipment_col_width * 3 / 5] * 5
 
-            disk_table = Table(disk_data, colWidths=disk_col_widths)
-            disk_table.setStyle(TableStyle([
-                ('SPAN', (0, 0), (0, 1)),  # DISK spans across two rows
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (0, 1), 'MIDDLE'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTNAME', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
-            ]))
-            elements.append(disk_table)
+        disk_table = Table(disk_data, colWidths=disk_col_widths)
+        disk_table.setStyle(TableStyle([
+            ('SPAN', (0, 0), (0, 1)),  # DISK spans across two rows
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (0, 1), 'MIDDLE'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTNAME', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
+        ]))
+        elements.append(disk_table)
 
-            resource_data = [
-                ['프로세스 별 CPU 사용량 TOP 5']
-            ]
+        resource_data = [
+            ['프로세스 별 CPU 사용량 TOP 5']
+        ]
 
-            # Adjust column widths to fit the page width
-            resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
-            resource_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 13),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
-            ]))
-            elements.append(resource_table)
+        # Adjust column widths to fit the page width
+        resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
+        resource_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 13),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
+        ]))
+        elements.append(resource_table)
 
-            top_cpu_usages = get_process_cpu_usage_top5(selected_ip, start_date_obj, end_date_obj)
+        top_cpu_usages = get_process_cpu_usage_top5(selected_ip, start_date_obj, end_date_obj)
 
-            # Define the new table data
-            process_cpu_data = [
-                ['Command', 'PID', 'User', 'CPU%']
-            ]
+        # Define the new table data
+        process_cpu_data = [
+            ['Command', 'PID', 'User', 'CPU%']
+        ]
 
-            for usage in top_cpu_usages:
-                process_cpu_data.append([
-                    truncate_text(usage['command'], 20),
-                    usage['pid'],
-                    usage['instance_user'],
-                    f"{usage['avg_cpu_usage']:.1f}"
-                ])
+        for usage in top_cpu_usages:
+            process_cpu_data.append([
+                truncate_text(usage['command'], 20),
+                usage['pid'],
+                usage['instance_user'],
+                f"{usage['avg_cpu_usage']:.1f}"
+            ])
 
-            # Adjust column widths to fit the page width
-            new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
-            new_table = Table(process_cpu_data, colWidths=[new_table_col_width] * 2)
-            new_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTNAME', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
-            ]))
+        # Adjust column widths to fit the page width
+        new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
+        new_table = Table(process_cpu_data, colWidths=[new_table_col_width] * 2)
+        new_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTNAME', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
+        ]))
 
-            # Add the new table to the elements list
-            elements.append(new_table)
+        # Add the new table to the elements list
+        elements.append(new_table)
 
-            # text_between_tables = Paragraph("프로세스 별 MEM 사용량 TOP 5", process_style)
-            # elements.append(text_between_tables)
+        # text_between_tables = Paragraph("프로세스 별 MEM 사용량 TOP 5", process_style)
+        # elements.append(text_between_tables)
 
-            resource_data = [
-                ['프로세스 별 MEM 사용량 TOP 5']
-            ]
+        resource_data = [
+            ['프로세스 별 MEM 사용량 TOP 5']
+        ]
 
-            # Adjust column widths to fit the page width
-            resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
-            resource_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 13),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
-            ]))
-            elements.append(resource_table)
+        # Adjust column widths to fit the page width
+        resource_table = Table(resource_data, colWidths=[equipment_col_width * 4])
+        resource_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 13),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),  # Increase bottom padding
+        ]))
+        elements.append(resource_table)
 
-            top_mem_usages = get_process_mem_usage_top5(selected_ip, start_date_obj, end_date_obj)
+        top_mem_usages = get_process_mem_usage_top5(selected_ip, start_date_obj, end_date_obj)
 
-            # Define the new table data
-            process_mem_data = [
-                ['Command', 'PID', 'User', 'MEM%']
-            ]
+        # Define the new table data
+        process_mem_data = [
+            ['Command', 'PID', 'User', 'MEM%']
+        ]
 
-            for usage in top_mem_usages:
-                process_mem_data.append([
-                    truncate_text(usage['command'], 20),
-                    usage['pid'],
-                    usage['instance_user'],
-                    f"{usage['avg_mem_usage']:.1f}"
-                ])
+        for usage in top_mem_usages:
+            process_mem_data.append([
+                truncate_text(usage['command'], 20),
+                usage['pid'],
+                usage['instance_user'],
+                f"{usage['avg_mem_usage']:.1f}"
+            ])
 
-            # Adjust column widths to fit the page width
-            new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
-            new_table = Table(process_mem_data, colWidths=[new_table_col_width] * 2)
-            new_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, -1), 'font'),
-                ('FONTNAME', (0, 0), (-1, -1), 'font'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
-                ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
-            ]))
+        # Adjust column widths to fit the page width
+        new_table_col_width = (doc.pagesize[0] - 2 * 72) / 4  # Divide by the number of columns
+        new_table = Table(process_mem_data, colWidths=[new_table_col_width] * 2)
+        new_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 0), (-1, -1), 'font'),
+            ('FONTNAME', (0, 0), (-1, -1), 'font'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),  # Add grid lines
+            ('TOPPADDING', (0, 0), (-1, -1), 6),  # Increase top padding
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),  # Increase bottom padding
+        ]))
 
-            # Add the new table to the elements list
-            elements.append(new_table)
+        # Add the new table to the elements list
+        elements.append(new_table)
 
-            elements.append(PageBreak())
+        elements.append(PageBreak())
 
 ##############################################################################################################################################
 
@@ -611,8 +626,5 @@ def template_view(request, instance_id, reportType, start_date, end_date):
     pdf = buffer.getvalue()
     buffer.close()
 
-    print(start_date_obj)
-    print(end_date_obj)
-    print(engineName)
     response = FileResponse(io.BytesIO(pdf), as_attachment=True, filename='instance_report.pdf')
     return response
